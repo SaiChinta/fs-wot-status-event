@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>FS_SaStatusEventHandler</members>
+        <members>FS_SaStatusEventHandlerTest</members>
+        <members>FS_InspectionStatusEventMapper</members>
+        <members>FS_InspectionStatusEventSettings</members>
+        <members>FS_InspectionStatusPayloadDTO</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>FS_SaStatusEventTrigger</members>
+        <name>ApexTrigger</name>
+    </types>
+    <types>
+        <members>FS_InspectionDataUpdate_Event_Publisher</members>
+        <name>PermissionSet</name>
+    </types>
+    <types>
+        <members>FS_Inspection_Status_Event_Setting__mdt</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>FS_Inspection_Status_Event_Setting__mdt.Is_Active__c</members>
+        <members>FS_Inspection_Status_Event_Setting__mdt.Description__c</members>
+        <members>FS_Inspection_Status_Event_Setting__mdt.Event_Type__c</members>
+        <members>FS_Inspection_Status_Event_Setting__mdt.Unscheduled_Status__c</members>
+        <members>FS_Inspection_Status_Event_Setting__mdt.Scope_To_Field_Services_Record_Type__c</members>
+        <members>ServiceAppointment.FS_IsManualInspection__c</members>
+        <members>WorkOrder.FS_IsManualInspection__c</members>
+        <members>WorkOrderLineItem.FS_IsManualInspection__c</members>
+        <name>CustomField</name>
+    </types>
+    <types>
+        <members>FS_Inspection_Status_Event_Setting.Default_Setting</members>
+        <members>sObject_Trigger_Setting.ServiceAppointment</members>
+        <members>Trigger_Action.FS_SaStatusEventAfterUpdate</members>
+        <name>CustomMetadata</name>
+    </types>
+    <types>
+        <members>FS_Inspection_Status_Event_Setting__mdt-FS Inspection Status Event Setting Layout</members>
+        <name>Layout</name>
+    </types>
+    <version>61.0</version>
+</Package>

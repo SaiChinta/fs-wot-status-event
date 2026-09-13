@@ -1,0 +1,11 @@
+{
+  "packageDirectories": [
+    {
+      "path": "force-app",
+      "default": true
+    }
+  ],
+  "name": "fs-wot-status-event",
+  "namespace": "",
+  "sourceApiVersion": "61.0"
+}

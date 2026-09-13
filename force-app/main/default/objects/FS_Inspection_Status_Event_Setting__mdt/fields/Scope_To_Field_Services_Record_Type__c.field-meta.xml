@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Scope_To_Field_Services_Record_Type__c</fullName>
+    <defaultValue>true</defaultValue>
+    <description>Publication always requires the Field_Services record type. This field is retained for setting layout compatibility.</description>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <label>Scope To Field Services Record Type</label>
+    <securityClassification>Confidential</securityClassification>
+    <type>Checkbox</type>
+</CustomField>

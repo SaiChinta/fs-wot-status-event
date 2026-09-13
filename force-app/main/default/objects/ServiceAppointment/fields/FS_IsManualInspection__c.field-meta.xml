@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>FS_IsManualInspection__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>True when this Service Appointment is a backfill for a manual booking created in CRM. Manual inspections are excluded from FS_InspectionDataUpdate__e publication.</description>
+    <externalId>false</externalId>
+    <label>Is Manual Inspection</label>
+    <securityClassification>Confidential</securityClassification>
+    <trackFeedHistory>false</trackFeedHistory>
+    <trackHistory>false</trackHistory>
+    <type>Checkbox</type>
+</CustomField>
