@@ -2,20 +2,209 @@
 <RecordType xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Field_Services</fullName>
     <active>true</active>
-    <description>Used by Field Service reusable automation. Other business units should not use this record type.</description>
+    <description>Used by Field Service Alert Center automation. Other business units should not use this record type.</description>
     <label>Field Services</label>
     <picklistValues>
-        <picklist>Status</picklist>
+        <picklist>FSL__InJeopardyReason__c</picklist>
+        <values>
+            <fullName>Delayed Finish</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Delayed Start</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Due Date Approaching</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>No Response</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>FSL__Schedule_Mode__c</picklist>
+        <values>
+            <fullName>Automatic</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Drag and Drop</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Global Optimization</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>In Day Optimization</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Manual</fullName>
+            <default>false</default>
+        </values>
         <values>
             <fullName>None</fullName>
             <default>true</default>
         </values>
         <values>
-            <fullName>Scheduled</fullName>
+            <fullName>Optimization</fullName>
             <default>false</default>
         </values>
         <values>
-            <fullName>Dispatched</fullName>
+            <fullName>Resource Optimization</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Schedule</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>FSL__Time_Dependency__c</picklist>
+        <values>
+            <fullName>Finish Before Start</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Same Start</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Start After Finish</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>FS_Booking_Type__c</picklist>
+        <values>
+            <fullName>Group</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Multi 5</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Multi 5%2B</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Single</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>FS_Cancelled_Reason__c</picklist>
+        <values>
+            <fullName>Other</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Same day cancellation</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Site not ready</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>FS_Customer_Preferred_Time__c</picklist>
+        <values>
+            <fullName>AM</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>PM</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>FS_Inspection_Status__c</picklist>
+        <values>
+            <fullName>ACDN</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Booked</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>CAN</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>CANN</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>CPLT</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>FAIL</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Failed</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>NACC</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>OPEN</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>PAR</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>PASS</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>PLEM</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>PLRM</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>PROC</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>PSTP</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Passed</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>STDB</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>UKWN</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>WAIV</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Status</picklist>
+        <values>
+            <fullName>Canceled</fullName>
             <default>false</default>
         </values>
         <values>
@@ -23,15 +212,23 @@
             <default>false</default>
         </values>
         <values>
-            <fullName>Canceled</fullName>
+            <fullName>Dispatched</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>None</fullName>
+            <default>true</default>
+        </values>
+        <values>
+            <fullName>OnSite</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Scheduled</fullName>
             <default>false</default>
         </values>
         <values>
             <fullName>Travel</fullName>
-            <default>false</default>
-        </values>
-        <values>
-            <fullName>OnSite</fullName>
             <default>false</default>
         </values>
     </picklistValues>

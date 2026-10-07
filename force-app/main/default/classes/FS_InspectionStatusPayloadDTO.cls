@@ -8,10 +8,16 @@ public class FS_InspectionStatusPayloadDTO {
   public String appointmentNumber;
   public String priority;
   public String bookingReferenceNumber;
-  public String inspectionId;
+  public String bookingNotes;
+  public String crmInspectionId;
+  public String sfsInspectionId;
   public String bcoNumber;
+  public String propertyId;
+  public String propertyAddress;
   public String workOrderLineItemNumber;
   public String workTypeName;
+  public String inspectionType;
+  public String contactInformation;
   public String bcoComplexity;
   public Datetime arrivalWindowStartTime;
   public Datetime arrivalWindowEndTime;
@@ -32,9 +38,12 @@ public class FS_InspectionStatusPayloadDTO {
   public String cancelledReason;
   public String bookingType;
   public Boolean isConfirmed;
+  public Id assignedInspectorId;
+  public String assignedInspectorName;
   public ParentWorkDTO parentWork;
   public UserAuditDTO lastModifiedBy;
   public List<AssignedResourceDTO> assignedCrewMembers;
+  
 
   /**
    * @description Parent Work Order and Work Order Line Item identifiers and numbers.

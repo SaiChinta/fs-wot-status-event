@@ -3,6 +3,7 @@
     <types>
         <members>FS_SaStatusEventHandler</members>
         <members>FS_SaStatusEventHandlerTest</members>
+        <members>FS_AssignedResourceInspectorHandler</members>
         <members>FS_InspectionStatusEventMapper</members>
         <members>FS_InspectionStatusEventSettings</members>
         <members>FS_InspectionStatusPayloadDTO</members>
@@ -10,6 +11,7 @@
     </types>
     <types>
         <members>FS_SaStatusEventTrigger</members>
+        <members>FS_AssignedResourceInspectorTrigger</members>
         <name>ApexTrigger</name>
     </types>
     <types>
@@ -27,6 +29,8 @@
         <members>FS_Inspection_Status_Event_Setting__mdt.Unscheduled_Status__c</members>
         <members>FS_Inspection_Status_Event_Setting__mdt.Scope_To_Field_Services_Record_Type__c</members>
         <members>ServiceAppointment.FS_IsManualInspection__c</members>
+        <members>ServiceAppointment.FS_Is_Confirmed__c</members>
+        <members>ServiceAppointment.FS_Assigned_Inspector__c</members>
         <members>WorkOrder.FS_IsManualInspection__c</members>
         <members>WorkOrderLineItem.FS_IsManualInspection__c</members>
         <name>CustomField</name>
@@ -34,7 +38,12 @@
     <types>
         <members>FS_Inspection_Status_Event_Setting.Default_Setting</members>
         <members>sObject_Trigger_Setting.ServiceAppointment</members>
+        <members>sObject_Trigger_Setting.AssignedResource</members>
+        <members>Trigger_Action.FS_SaStatusEventAfterInsert</members>
         <members>Trigger_Action.FS_SaStatusEventAfterUpdate</members>
+        <members>Trigger_Action.FS_AssignedInspectorAfterInsert</members>
+        <members>Trigger_Action.FS_AssignedInspectorAfterUpdate</members>
+        <members>Trigger_Action.FS_AssignedInspectorAfterDelete</members>
         <name>CustomMetadata</name>
     </types>
     <types>

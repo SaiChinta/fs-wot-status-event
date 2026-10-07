@@ -125,6 +125,8 @@ private class FS_SaStatusEventHandlerTest {
         FS_Work_Order_Line_Item__c,
         FS_ExternalRefId__c,
         FS_IsManualInspection__c,
+        FS_Is_Confirmed__c,
+        FS_Assigned_Inspector__c,
         Priority__c,
         SchedStartTime,
         SchedEndTime,
@@ -145,7 +147,55 @@ private class FS_SaStatusEventHandlerTest {
   }
 
   /**
-   * @description Applies an in-memory Default_Setting override.
+   * @description Returns a Service Resource Id that can be stored on FS_Assigned_Inspector__c.
+   * @return An active technician Service Resource Id for the running user.
+   */
+  private static Id ensureInspectorId() {
+    List<ServiceResource> existingResources = [
+      SELECT Id
+      FROM ServiceResource
+      WHERE RelatedRecordId = :UserInfo.getUserId()
+      LIMIT 1
+    ];
+    if (!existingResources.isEmpty()) {
+      return existingResources[0].Id;
+    }
+    ServiceResource resource = new ServiceResource(
+      Name = 'Inspection Test Resource',
+      RelatedRecordId = UserInfo.getUserId(),
+      IsActive = true,
+      ResourceType = 'T'
+    );
+    insert resource;
+    return resource.Id;
+  }
+
+  /**
+   * @description Ensures the Service Resource can be assigned in the appointment territory.
+   * @param resourceId Service Resource Id.
+   * @param territoryId Service Territory Id.
+   */
+  private static void ensureTerritoryMembership(Id resourceId, Id territoryId) {
+    List<ServiceTerritoryMember> existingMembers = [
+      SELECT Id
+      FROM ServiceTerritoryMember
+      WHERE ServiceResourceId = :resourceId
+        AND ServiceTerritoryId = :territoryId
+      LIMIT 1
+    ];
+    if (!existingMembers.isEmpty()) {
+      return;
+    }
+    insert new ServiceTerritoryMember(
+      ServiceResourceId = resourceId,
+      ServiceTerritoryId = territoryId,
+      EffectiveStartDate = DateTime.now().addDays(-1),
+      TerritoryType = 'P'
+    );
+  }
+
+  /**
+   * @description Overrides the CMDT setting for the rest of the test transaction.
    * @param isActive Whether publication is active.
    */
   private static void applySettingsOverride(Boolean isActive) {
@@ -204,12 +254,13 @@ private class FS_SaStatusEventHandlerTest {
   }
 
   /**
-   * @description A transition into Scheduled publishes InspectionStatusUpdate.
+   * @description A Scheduled update that sets a new inspector and both schedule times publishes once.
    */
   @IsTest
-  static void testEnteringScheduledPublishesEvent() {
+  static void testNewInspectorAndNewTimesPublishesEvent() {
     applySettingsOverride(true);
     registerStatusTransitions();
+    Id inspectorId = ensureInspectorId();
     ServiceAppointment oldRecord = getTestAppointment();
     ServiceAppointment appointment = oldRecord.clone(true, true, false, false);
 
@@ -217,6 +268,7 @@ private class FS_SaStatusEventHandlerTest {
     appointment.Status = 'Scheduled';
     appointment.SchedStartTime = DateTime.now().addHours(1);
     appointment.SchedEndTime = DateTime.now().addHours(3);
+    appointment.FS_Assigned_Inspector__c = inspectorId;
     update appointment;
     invokeAfterUpdate(getTestAppointment(), oldRecord);
     Test.stopTest();
@@ -224,7 +276,7 @@ private class FS_SaStatusEventHandlerTest {
     System.assertEquals(
       1,
       FS_SaStatusEventHandler.publishedEventsForTest.size(),
-      'Entering Scheduled should publish InspectionStatusUpdate.'
+      'A new inspector and new schedule times should publish one event.'
     );
     FS_InspectionDataUpdate__e eventRecord = FS_SaStatusEventHandler.publishedEventsForTest[0];
     System.assertEquals(
@@ -232,67 +284,44 @@ private class FS_SaStatusEventHandlerTest {
       eventRecord.EventType__c,
       'Every publish uses InspectionStatusUpdate.'
     );
-    System.assertEquals(
-      'I004382766',
-      eventRecord.InspectionId__c,
-      'InspectionId__c should map from FS_ExternalRefId__c.'
+    Map<String, Object> payload = (Map<String, Object>) JSON.deserializeUntyped(
+      eventRecord.Payload__c
     );
-    System.assertEquals(
-      String.valueOf(appointment.Id),
-      eventRecord.ServiceAppointmentId__c,
-      'ServiceAppointmentId__c should be the appointment Id.'
-    );
+    System.assertEquals('Scheduled', payload.get('status'));
+    System.assertEquals(String.valueOf(inspectorId), payload.get('assignedInspectorId'));
+    System.assertNotEquals(null, payload.get('schedStartTime'));
+    System.assertNotEquals(null, payload.get('schedEndTime'));
+    System.assertEquals('IB-20260731-000001', payload.get('bookingReferenceNumber'));
+    System.assertEquals('I004382766', payload.get('sfsInspectionId'));
   }
 
   /**
-   * @description Status change to Canceled publishes InspectionStatusUpdate with parent Ids.
+   * @description A transition to Canceled publishes one inspection event.
    */
   @IsTest
   static void testCanceledStatusPublishesEvent() {
     applySettingsOverride(true);
     registerStatusTransitions();
-    ServiceAppointment oldRecord = getTestAppointment();
-    ServiceAppointment appointment = oldRecord.clone(true, true, false, false);
+    ServiceAppointment appointment = getTestAppointment();
+    ServiceAppointment oldRecord = appointment.clone(true, true, false, false);
 
     Test.startTest();
     appointment.Status = 'Canceled';
+    appointment.FS_Cancelled_Reason__c = 'Other';
     update appointment;
     invokeAfterUpdate(getTestAppointment(), oldRecord);
     Test.stopTest();
 
-    List<FS_InspectionDataUpdate__e> published = FS_SaStatusEventHandler.publishedEventsForTest;
-    System.assertEquals(1, published.size(), 'Canceled should publish one event.');
-    FS_InspectionDataUpdate__e eventRecord = published[0];
     System.assertEquals(
-      'InspectionStatusUpdate',
-      eventRecord.EventType__c,
-      'Canceled should still use InspectionStatusUpdate.'
-    );
-    System.assertEquals(
-      String.valueOf(oldRecord.FS_Work_Order__c),
-      eventRecord.WorkOrderId__c,
-      'WorkOrderId__c should map from FS_Work_Order__c.'
-    );
-    System.assertEquals(
-      String.valueOf(oldRecord.FS_Work_Order_Line_Item__c),
-      eventRecord.WorkOrderLineItemId__c,
-      'WorkOrderLineItemId__c should map from FS_Work_Order_Line_Item__c.'
-    );
-    System.assertEquals(
-      'IB-20260731-000001',
-      eventRecord.BookingReferenceNumber__c,
-      'BookingReferenceNumber__c should map from WorkOrder.FS_Booking_Reference__c.'
+      1,
+      FS_SaStatusEventHandler.publishedEventsForTest.size(),
+      'Canceling an appointment should publish one event.'
     );
     Map<String, Object> payload = (Map<String, Object>) JSON.deserializeUntyped(
-      eventRecord.Payload__c
+      FS_SaStatusEventHandler.publishedEventsForTest[0].Payload__c
     );
     System.assertEquals('Canceled', payload.get('status'));
-    System.assertEquals('IB-20260731-000001', payload.get('bookingReferenceNumber'));
-    System.assertEquals('I004382766', payload.get('inspectionId'));
-    System.assertEquals(
-      'InspectionStatusUpdate',
-      payload.get('eventType')
-    );
+    System.assertEquals('Other', payload.get('cancelledReason'));
   }
 
   /**
@@ -304,7 +333,10 @@ private class FS_SaStatusEventHandlerTest {
     ServiceAppointment oldRecord = getTestAppointment();
     ServiceAppointment newRecord = oldRecord.clone(true, true, false, false);
     newRecord.RecordTypeId = null;
-    newRecord.Status = 'Canceled';
+    newRecord.Status = 'Scheduled';
+    newRecord.SchedStartTime = DateTime.now().addHours(1);
+    newRecord.SchedEndTime = DateTime.now().addHours(3);
+    newRecord.FS_Assigned_Inspector__c = ensureInspectorId();
 
     Test.startTest();
     FS_SaStatusEventHandler.publishedEventsForTest.clear();
@@ -330,7 +362,10 @@ private class FS_SaStatusEventHandlerTest {
     ServiceAppointment oldRecord = getTestAppointment();
     ServiceAppointment newRecord = oldRecord.clone(true, true, false, false);
     newRecord.FS_IsManualInspection__c = true;
-    newRecord.Status = 'Canceled';
+    newRecord.Status = 'Scheduled';
+    newRecord.SchedStartTime = DateTime.now().addHours(1);
+    newRecord.SchedEndTime = DateTime.now().addHours(3);
+    newRecord.FS_Assigned_Inspector__c = ensureInspectorId();
 
     Test.startTest();
     FS_SaStatusEventHandler.publishedEventsForTest.clear();
@@ -348,16 +383,18 @@ private class FS_SaStatusEventHandlerTest {
   }
 
   /**
-   * @description Scheduled start and end changes while already Scheduled publish InspectionStatusUpdate.
+   * @description Schedule time changes with the same inspector publish InspectionStatusUpdate.
    */
   @IsTest
   static void testScheduleChangeOnScheduledPublishesEvent() {
     applySettingsOverride(true);
     registerStatusTransitions();
+    Id inspectorId = ensureInspectorId();
     ServiceAppointment appointment = getTestAppointment();
     appointment.Status = 'Scheduled';
     appointment.SchedStartTime = DateTime.now().addHours(1);
     appointment.SchedEndTime = DateTime.now().addHours(3);
+    appointment.FS_Assigned_Inspector__c = inspectorId;
     update appointment;
     ServiceAppointment oldRecord = getTestAppointment();
 
@@ -371,7 +408,7 @@ private class FS_SaStatusEventHandlerTest {
     System.assertEquals(
       1,
       FS_SaStatusEventHandler.publishedEventsForTest.size(),
-      'Changing scheduled start or end on a Scheduled appointment should publish.'
+      'Changing scheduled start or end with the same inspector should publish.'
     );
     FS_InspectionDataUpdate__e eventRecord = FS_SaStatusEventHandler.publishedEventsForTest[0];
     System.assertEquals(
@@ -448,10 +485,13 @@ private class FS_SaStatusEventHandlerTest {
       ServiceResourceId = resourceId,
       EstimatedTravelTime = 12
     );
+    appointment.FS_Assigned_Inspector__c = resourceId;
+    update appointment;
 
     ServiceAppointment oldRecord = getTestAppointment();
     Test.startTest();
-    appointment.Status = 'Dispatched';
+    appointment.SchedStartTime = DateTime.now().addHours(2);
+    appointment.SchedEndTime = DateTime.now().addHours(4);
     update appointment;
     invokeAfterUpdate(getTestAppointment(), oldRecord);
     Test.stopTest();
@@ -465,7 +505,7 @@ private class FS_SaStatusEventHandlerTest {
     System.assertEquals(
       1,
       FS_SaStatusEventHandler.publishedEventsForTest.size(),
-      'Dispatching a scheduled appointment with an assigned resource should publish.'
+      'A schedule change on a Scheduled appointment with an assigned resource should publish.'
     );
     Map<String, Object> payload = (Map<String, Object>) JSON.deserializeUntyped(
       FS_SaStatusEventHandler.publishedEventsForTest[0].Payload__c
@@ -493,9 +533,11 @@ private class FS_SaStatusEventHandlerTest {
     applySettingsOverride(true);
     registerStatusTransitions();
     ServiceAppointment appointment = getTestAppointment();
+    Id inspectorId = ensureInspectorId();
     appointment.Status = 'Scheduled';
     appointment.SchedStartTime = DateTime.now().addHours(1);
     appointment.SchedEndTime = DateTime.now().addHours(3);
+    appointment.FS_Assigned_Inspector__c = inspectorId;
     update appointment;
     ServiceAppointment oldRecord = getTestAppointment();
     ServiceAppointment newRecord = oldRecord.clone(true, true, false, false);
@@ -518,16 +560,17 @@ private class FS_SaStatusEventHandlerTest {
   }
 
   /**
-   * @description Unscheduling to None publishes InspectionStatusUpdate. Null schedule fields are omitted.
+   * @description Status None while the inspector is still set does not publish.
    */
   @IsTest
-  static void testUnschedulePublishesEvent() {
+  static void testUnscheduleDoesNotPublish() {
     applySettingsOverride(true);
     registerStatusTransitions();
     ServiceAppointment appointment = getTestAppointment();
     appointment.Status = 'Scheduled';
     appointment.SchedStartTime = DateTime.now().addHours(1);
     appointment.SchedEndTime = DateTime.now().addHours(3);
+    appointment.FS_Assigned_Inspector__c = ensureInspectorId();
     update appointment;
     ServiceAppointment oldRecord = getTestAppointment();
 
@@ -538,20 +581,167 @@ private class FS_SaStatusEventHandlerTest {
     Test.stopTest();
 
     System.assertEquals(
-      1,
+      0,
       FS_SaStatusEventHandler.publishedEventsForTest.size(),
-      'Unscheduling to None should publish a platform event.'
+      'Unschedule should wait until the assigned inspector lookup is cleared.'
     );
-    FS_InspectionDataUpdate__e eventRecord = FS_SaStatusEventHandler.publishedEventsForTest[0];
+  }
+
+  /**
+   * @description Insert does not publish, including when the row is already confirmed.
+   */
+  @IsTest
+  static void testCreateDoesNotPublish() {
+    applySettingsOverride(true);
+    ServiceAppointment created = getTestAppointment();
+    created.FS_Is_Confirmed__c = true;
+
+    Test.startTest();
+    FS_SaStatusEventHandler.publishedEventsForTest.clear();
+    new FS_SaStatusEventHandler().afterInsert(new List<SObject>{ created });
+    Test.stopTest();
+
+    System.assertEquals(
+      0,
+      FS_SaStatusEventHandler.publishedEventsForTest.size(),
+      'Creating a Service Appointment should not publish.'
+    );
+  }
+
+  /**
+   * @description Setting FS_Is_Confirmed__c to true on update publishes one event.
+   */
+  @IsTest
+  static void testConfirmedUpdatePublishesEvent() {
+    applySettingsOverride(true);
+    ServiceAppointment oldRecord = getTestAppointment();
+    oldRecord.FS_Is_Confirmed__c = false;
+    ServiceAppointment newRecord = oldRecord.clone(true, true, false, false);
+    newRecord.FS_Is_Confirmed__c = true;
+
+    Test.startTest();
+    String eventType = FS_SaStatusEventHandler.resolveEventType(
+      newRecord,
+      oldRecord,
+      FS_InspectionStatusEventSettings.getConfig()
+    );
+    Test.stopTest();
+
     System.assertEquals(
       'InspectionStatusUpdate',
-      eventRecord.EventType__c,
-      'Unschedule should use InspectionStatusUpdate.'
+      eventType,
+      'Setting Is Confirmed on update should publish.'
+    );
+  }
+
+  /**
+   * @description Status None to Scheduled publishes when the inspector and both times are already stored.
+   */
+  @IsTest
+  static void testStatusBecomesScheduledPublishesEvent() {
+    applySettingsOverride(true);
+    ServiceAppointment oldRecord = getTestAppointment();
+    oldRecord.Status = 'None';
+    oldRecord.SchedStartTime = DateTime.now().addHours(1);
+    oldRecord.SchedEndTime = DateTime.now().addHours(2);
+    oldRecord.FS_Assigned_Inspector__c = ensureInspectorId();
+    ServiceAppointment newRecord = oldRecord.clone(true, true, false, false);
+    newRecord.Status = 'Scheduled';
+
+    Test.startTest();
+    String eventType = FS_SaStatusEventHandler.resolveEventType(
+      newRecord,
+      oldRecord,
+      FS_InspectionStatusEventSettings.getConfig()
+    );
+    Test.stopTest();
+
+    System.assertEquals(
+      'InspectionStatusUpdate',
+      eventType,
+      'Flipping status to Scheduled should publish when the inspector and both times are already set.'
+    );
+  }
+
+  /**
+   * @description A scheduled appointment moved to a new time and a new inspector publishes once.
+   */
+  @IsTest
+  static void testResourceDragPublishesOneEvent() {
+    applySettingsOverride(true);
+    registerStatusTransitions();
+    User owner = newReplacementOwner();
+    insert owner;
+    System.runAs(new User(Id = UserInfo.getUserId())) {
+      dragScheduledAppointment(owner.Id);
+    }
+  }
+
+  /**
+   * @description Saves a new time and a new inspector as two updates and expects one event.
+   * @param replacementOwnerId User who owns the resource the appointment is dropped onto.
+   */
+  private static void dragScheduledAppointment(Id replacementOwnerId) {
+    Id firstInspectorId = ensureInspectorId();
+    ServiceResource replacement = new ServiceResource(
+      Name = 'Drag Target Resource',
+      RelatedRecordId = replacementOwnerId,
+      IsActive = true,
+      ResourceType = 'T'
+    );
+    insert replacement;
+    ServiceAppointment appointment = getTestAppointment();
+    appointment.Status = 'Scheduled';
+    appointment.SchedStartTime = DateTime.now().addHours(1);
+    appointment.SchedEndTime = DateTime.now().addHours(2);
+    appointment.FS_Assigned_Inspector__c = firstInspectorId;
+    update appointment;
+
+    Test.startTest();
+    FS_SaStatusEventHandler.publishedEventsForTest.clear();
+    appointment.SchedStartTime = DateTime.now().addHours(3);
+    appointment.SchedEndTime = DateTime.now().addHours(4);
+    update appointment;
+    appointment.FS_Assigned_Inspector__c = replacement.Id;
+    update appointment;
+    Test.stopTest();
+
+    System.assertEquals(
+      1,
+      FS_SaStatusEventHandler.publishedEventsForTest.size(),
+      'Dragging a scheduled appointment onto another resource should publish one event.'
     );
     Map<String, Object> payload = (Map<String, Object>) JSON.deserializeUntyped(
-      eventRecord.Payload__c
+      FS_SaStatusEventHandler.publishedEventsForTest[0].Payload__c
     );
-    System.assertEquals('None', payload.get('status'));
+    System.assertEquals(String.valueOf(replacement.Id), payload.get('assignedInspectorId'));
+    System.assertNotEquals(null, payload.get('schedStartTime'));
+  }
+
+  /**
+   * @description Entering Scheduled without both schedule times does not publish.
+   */
+  @IsTest
+  static void testScheduledWithoutTimesDoesNotPublish() {
+    applySettingsOverride(true);
+    ServiceAppointment oldRecord = getTestAppointment();
+    ServiceAppointment newRecord = oldRecord.clone(true, true, false, false);
+    newRecord.Status = 'Scheduled';
+    newRecord.FS_Assigned_Inspector__c = ensureInspectorId();
+
+    Test.startTest();
+    String eventType = FS_SaStatusEventHandler.resolveEventType(
+      newRecord,
+      oldRecord,
+      FS_InspectionStatusEventSettings.getConfig()
+    );
+    Test.stopTest();
+
+    System.assertEquals(
+      null,
+      eventType,
+      'Scheduled without SchedStartTime and SchedEndTime should not publish.'
+    );
   }
 
   /**
@@ -563,9 +753,13 @@ private class FS_SaStatusEventHandlerTest {
     registerStatusTransitions();
     ServiceAppointment oldRecord = getTestAppointment();
     ServiceAppointment appointment = oldRecord.clone(true, true, false, false);
+    Id inspectorId = ensureInspectorId();
 
     Test.startTest();
-    appointment.Status = 'Canceled';
+    appointment.Status = 'Scheduled';
+    appointment.SchedStartTime = DateTime.now().addHours(1);
+    appointment.SchedEndTime = DateTime.now().addHours(3);
+    appointment.FS_Assigned_Inspector__c = inspectorId;
     update appointment;
     invokeAfterUpdate(getTestAppointment(), oldRecord);
     Test.stopTest();
@@ -652,5 +846,226 @@ private class FS_SaStatusEventHandlerTest {
       config.unscheduledStatus,
       'Blank Unscheduled_Status__c should default to None.'
     );
+  }
+
+  /**
+   * @description Clearing the inspector while status is None publishes one unschedule event.
+   */
+  @IsTest
+  static void testUnschedulePublishesWhenInspectorCleared() {
+    applySettingsOverride(true);
+    registerStatusTransitions();
+    ServiceAppointment appointment = getTestAppointment();
+    appointment.Status = 'Scheduled';
+    appointment.SchedStartTime = DateTime.now().addHours(1);
+    appointment.SchedEndTime = DateTime.now().addHours(3);
+    appointment.FS_Assigned_Inspector__c = ensureInspectorId();
+    update appointment;
+    ServiceAppointment oldRecord = getTestAppointment();
+
+    Test.startTest();
+    appointment.Status = 'None';
+    appointment.FS_Assigned_Inspector__c = null;
+    update appointment;
+    invokeAfterUpdate(getTestAppointment(), oldRecord);
+    Test.stopTest();
+
+    System.assertEquals(
+      1,
+      FS_SaStatusEventHandler.publishedEventsForTest.size(),
+      'Clearing the inspector on an unscheduled appointment should publish one event.'
+    );
+    Map<String, Object> payload = (Map<String, Object>) JSON.deserializeUntyped(
+      FS_SaStatusEventHandler.publishedEventsForTest[0].Payload__c
+    );
+    System.assertEquals('None', payload.get('status'));
+    System.assertEquals(null, payload.get('assignedInspectorId'));
+  }
+
+  /**
+   * @description A transition to Dispatched publishes even when the inspector is unchanged.
+   */
+  @IsTest
+  static void testDispatchedPublishesEvent() {
+    applySettingsOverride(true);
+    registerStatusTransitions();
+    ServiceAppointment appointment = getTestAppointment();
+    appointment.Status = 'Scheduled';
+    appointment.SchedStartTime = DateTime.now().addHours(1);
+    appointment.SchedEndTime = DateTime.now().addHours(3);
+    appointment.FS_Assigned_Inspector__c = ensureInspectorId();
+    update appointment;
+    ServiceAppointment oldRecord = getTestAppointment();
+
+    Test.startTest();
+    appointment.Status = 'Dispatched';
+    update appointment;
+    invokeAfterUpdate(getTestAppointment(), oldRecord);
+    Test.stopTest();
+
+    System.assertEquals(
+      1,
+      FS_SaStatusEventHandler.publishedEventsForTest.size(),
+      'Dispatching an appointment should publish one event.'
+    );
+    Map<String, Object> payload = (Map<String, Object>) JSON.deserializeUntyped(
+      FS_SaStatusEventHandler.publishedEventsForTest[0].Payload__c
+    );
+    System.assertEquals('Dispatched', payload.get('status'));
+  }
+
+  /**
+   * @description Changing only the inspector on a Scheduled appointment publishes.
+   */
+  @IsTest
+  static void testInspectorChangePublishesEvent() {
+    applySettingsOverride(true);
+    ServiceAppointment oldRecord = getTestAppointment();
+    oldRecord.Status = 'Scheduled';
+    oldRecord.SchedStartTime = DateTime.now().addHours(1);
+    oldRecord.SchedEndTime = DateTime.now().addHours(3);
+    oldRecord.FS_Assigned_Inspector__c = ensureInspectorId();
+    ServiceAppointment newRecord = oldRecord.clone(true, true, false, false);
+    // In memory only. A second technician needs its own user, which this assertion does not.
+    newRecord.FS_Assigned_Inspector__c = fakeServiceResourceId();
+
+    Test.startTest();
+    String eventType = FS_SaStatusEventHandler.resolveEventType(
+      newRecord,
+      oldRecord,
+      FS_InspectionStatusEventSettings.getConfig()
+    );
+    Test.stopTest();
+
+    System.assertEquals(
+      'InspectionStatusUpdate',
+      eventType,
+      'An inspector change with the same schedule times should publish.'
+    );
+  }
+
+  /**
+   * @description Assigned Resource insert, update, and delete maintain the inspector lookup.
+   */
+  @IsTest
+  static void testAssignedResourceStampsInspector() {
+    User owner = newReplacementOwner();
+    insert owner;
+    // User is a setup object. The rest of the DML has to run in another context.
+    Test.startTest();
+    System.runAs(new User(Id = UserInfo.getUserId())) {
+      stampInspectorFromAssignedResource(owner.Id);
+    }
+    Test.stopTest();
+  }
+
+  /**
+   * @description Inserts, reassigns, and deletes Assigned Resources and checks the inspector lookup.
+   * @param replacementOwnerId User who owns the second technician.
+   */
+  private static void stampInspectorFromAssignedResource(Id replacementOwnerId) {
+    applySettingsOverride(true);
+    ServiceAppointment appointment = getTestAppointment();
+    Id inspectorId = ensureInspectorId();
+    ensureTerritoryMembership(inspectorId, appointment.ServiceTerritoryId);
+    ServiceResource replacement = new ServiceResource(
+      Name = 'Inspection Replacement Resource',
+      RelatedRecordId = replacementOwnerId,
+      IsActive = true,
+      ResourceType = 'T'
+    );
+    insert replacement;
+    ensureTerritoryMembership(replacement.Id, appointment.ServiceTerritoryId);
+    registerStatusTransitions();
+    appointment.Status = 'Scheduled';
+    appointment.SchedStartTime = DateTime.now().addHours(1);
+    appointment.SchedEndTime = DateTime.now().addHours(3);
+    update appointment;
+
+    AssignedResource firstResource = new AssignedResource(
+      ServiceAppointmentId = appointment.Id,
+      ServiceResourceId = inspectorId
+    );
+    insert firstResource;
+    System.assertEquals(
+      inspectorId,
+      inspectorOn(appointment.Id),
+      'Inserting an Assigned Resource should stamp FS_Assigned_Inspector__c.'
+    );
+
+    firstResource.ServiceResourceId = replacement.Id;
+    update firstResource;
+    System.assertEquals(
+      replacement.Id,
+      inspectorOn(appointment.Id),
+      'Changing ServiceResourceId should update FS_Assigned_Inspector__c.'
+    );
+
+    firstResource.EstimatedTravelTime = 15;
+    update firstResource;
+    System.assertEquals(
+      replacement.Id,
+      inspectorOn(appointment.Id),
+      'A non-resource field change should leave the inspector lookup unchanged.'
+    );
+
+    AssignedResource secondResource = new AssignedResource(
+      ServiceAppointmentId = appointment.Id,
+      ServiceResourceId = inspectorId
+    );
+    insert secondResource;
+    delete secondResource;
+    System.assertEquals(
+      replacement.Id,
+      inspectorOn(appointment.Id),
+      'Deleting one Assigned Resource should keep the remaining inspector.'
+    );
+
+    delete firstResource;
+    System.assertEquals(
+      null,
+      inspectorOn(appointment.Id),
+      'Deleting the last Assigned Resource should clear FS_Assigned_Inspector__c.'
+    );
+  }
+
+  /**
+   * @description Builds an Id that is not a real Service Resource. Used for in-memory comparisons.
+   * @return A Service Resource Id that does not exist.
+   */
+  private static Id fakeServiceResourceId() {
+    return (Id) (ServiceResource.SObjectType.getDescribe().getKeyPrefix() + '000000000001');
+  }
+
+  /**
+   * @description Builds the user who will own the second technician. The caller inserts it.
+   * @return An unsaved User.
+   */
+  private static User newReplacementOwner() {
+    String unique = String.valueOf(DateTime.now().getTime());
+    return new User(
+      Alias = 'insp2',
+      Email = 'insp2' + unique + '@test.invalid',
+      EmailEncodingKey = 'UTF-8',
+      LastName = 'Inspector Two',
+      LanguageLocaleKey = 'en_US',
+      LocaleSidKey = 'en_NZ',
+      ProfileId = UserInfo.getProfileId(),
+      TimeZoneSidKey = 'Pacific/Auckland',
+      Username = 'insp2' + unique + '@test.invalid'
+    );
+  }
+
+  /**
+   * @description Returns the inspector lookup currently stored on the appointment.
+   * @param appointmentId Service Appointment Id.
+   * @return FS_Assigned_Inspector__c, or null.
+   */
+  private static Id inspectorOn(Id appointmentId) {
+    return [
+      SELECT FS_Assigned_Inspector__c
+      FROM ServiceAppointment
+      WHERE Id = :appointmentId
+    ].FS_Assigned_Inspector__c;
   }
 }

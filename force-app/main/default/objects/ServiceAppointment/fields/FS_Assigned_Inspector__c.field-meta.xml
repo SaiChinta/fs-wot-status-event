@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>FS_Assigned_Inspector__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>Service Resource assigned to this appointment. Maintained from Assigned Resource insert, update, and delete.</description>
+    <label>Assigned Inspector</label>
+    <referenceTo>ServiceResource</referenceTo>
+    <relationshipLabel>Assigned Inspections</relationshipLabel>
+    <relationshipName>FS_Assigned_Inspections</relationshipName>
+    <required>false</required>
+    <securityClassification>Confidential</securityClassification>
+    <trackHistory>false</trackHistory>
+    <type>Lookup</type>
+</CustomField>

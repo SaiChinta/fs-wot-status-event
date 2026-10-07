@@ -70,10 +70,16 @@ public inherited sharing class FS_InspectionStatusEventMapper {
     payload.appointmentNumber = sa.AppointmentNumber;
     payload.priority = sa.Priority__c;
     payload.bookingReferenceNumber = bookingReference(sa);
-    payload.inspectionId = sa.FS_ExternalRefId__c;
+    payload.bookingNotes = bookingNotes(sa);
+    payload.contactInformation = contactInformation(sa);
+    payload.crmInspectionId = sa.FS_CRMInspection_Id__c;
+    payload.sfsInspectionId = sa.FS_ExternalRefId__c;
     payload.bcoNumber = bcoNumber(sa);
+    payload.propertyId = bcoPropertyId(sa);
+    payload.propertyAddress = bcoPropertyAddress(sa);
     payload.workOrderLineItemNumber = lineItemNumber(sa);
     payload.workTypeName = sa.WorkType == null ? null : sa.WorkType.Name;
+    payload.inspectionType = sa.WorkType == null ? null : sa.WorkType.Name.substringBefore('_');
     payload.bcoComplexity = bcoComplexity(sa);
     payload.arrivalWindowStartTime = sa.ArrivalWindowStartTime;
     payload.arrivalWindowEndTime = sa.ArrivalWindowEndTime;
@@ -92,6 +98,10 @@ public inherited sharing class FS_InspectionStatusEventMapper {
     payload.cancelledReason = sa.FS_Cancelled_Reason__c;
     payload.bookingType = sa.FS_Booking_Type__c;
     payload.isConfirmed = sa.FS_Is_Confirmed__c == true;
+    payload.assignedInspectorId = sa.FS_Assigned_Inspector__c;
+    payload.assignedInspectorName = sa.FS_Assigned_Inspector__r == null
+      ? null
+      : sa.FS_Assigned_Inspector__r.Name;
     payload.parentWork = buildParentWork(sa);
     payload.lastModifiedBy = buildAudit(sa);
     List<FS_InspectionStatusPayloadDTO.AssignedResourceDTO> members = mapAssignedResources(
@@ -121,6 +131,46 @@ public inherited sharing class FS_InspectionStatusEventMapper {
     payload.estimatedTravelTimeMinutes = firstMember.estimatedTravelTimeMinutes;
     payload.estimatedTravelTimeSeconds = firstMember.estimatedTravelTimeSeconds;
   }
+
+  /**
+ * Retrieves formatted site contact details for a given Service Appointment.
+ * Returns formatted string "Name, Phone, Email" if found, otherwise returns null.
+ */
+public static String contactInformation(ServiceAppointment sa) {
+    if (sa == null || sa.FS_Work_Order__c == null) {
+        return null;
+    }
+
+    // Query into a List to safely prevent 'List has no rows for assignment' exceptions
+    List<Inspection_Site_Contact__c> siteContacts = [
+        SELECT FS_Contact_Name__c, FS_Contact_Phone__c, FS_Contact_Email__c
+        FROM Inspection_Site_Contact__c
+        WHERE FS_Work_Order__c = :sa.FS_Work_Order__c
+        WITH SYSTEM_MODE
+        LIMIT 1
+    ];
+
+    if (siteContacts.isEmpty()) {
+        return null;
+    }
+
+    Inspection_Site_Contact__c objSiteContact = siteContacts[0];
+
+    // Build formatted string filtering out null/empty fields dynamically
+    List<String> contactDetails = new List<String>();
+
+    if (String.isNotBlank(objSiteContact.FS_Contact_Name__c)) {
+        contactDetails.add(objSiteContact.FS_Contact_Name__c);
+    }
+    if (String.isNotBlank(objSiteContact.FS_Contact_Phone__c)) {
+        contactDetails.add(objSiteContact.FS_Contact_Phone__c);
+    }
+    if (String.isNotBlank(objSiteContact.FS_Contact_Email__c)) {
+        contactDetails.add(objSiteContact.FS_Contact_Email__c);
+    }
+
+    return contactDetails.isEmpty() ? null : String.join(contactDetails, ', ');
+}
 
   /**
    * @description Maps parent Work Order and Work Order Line Item fields.
@@ -228,6 +278,18 @@ public inherited sharing class FS_InspectionStatusEventMapper {
   }
 
   /**
+   * @description Work Order booking notes used as Description.
+   * @param sa Queried Service Appointment.
+   * @return Booking Notes, or null.
+   */
+  private static String bookingNotes(ServiceAppointment sa) {
+    if (sa.FS_Work_Order__r == null) {
+      return null;
+    }
+    return sa.FS_Work_Order__r.Description;
+  }
+
+  /**
    * @description BCO Number from the related BCO Detail record.
    * @param sa Queried Service Appointment.
    * @return BCO Number, or null.
@@ -237,6 +299,30 @@ public inherited sharing class FS_InspectionStatusEventMapper {
       return null;
     }
     return sa.FS_BCO_Detail__r.FS_BCO_Number__c;
+  }
+
+  /**
+   * @description BCO Property Id from the related BCO Detail record.
+   * @param sa Queried Service Appointment.
+   * @return BCO Property Id, or null.
+   */
+  private static String bcoPropertyId(ServiceAppointment sa) {
+    if (sa.FS_BCO_Detail__r == null) {
+      return null;
+    }
+    return sa.FS_BCO_Detail__r.FS_Property_ID__c;
+  }
+
+   /**
+   * @description BCO Property Address from the related BCO Detail record.
+   * @param sa Queried Service Appointment.
+   * @return BCO Property Address, or null.
+   */
+  private static String bcoPropertyAddress(ServiceAppointment sa) {
+    if (sa.FS_BCO_Detail__r == null) {
+      return null;
+    }
+    return sa.FS_BCO_Detail__r.FS_BCO_PropertyAddress__c;
   }
 
   /**

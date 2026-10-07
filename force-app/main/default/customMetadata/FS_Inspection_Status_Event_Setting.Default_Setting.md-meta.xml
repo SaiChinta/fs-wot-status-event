@@ -3,10 +3,6 @@
     <label>Default Setting</label>
     <protected>false</protected>
     <values>
-        <field>Is_Active__c</field>
-        <value xsi:type="xsd:boolean">true</value>
-    </values>
-    <values>
         <field>Description__c</field>
         <value xsi:type="xsd:string">Publishes FS_InspectionDataUpdate__e for Field Services appointment status and scheduled start/end changes. Manual CRM backfills are excluded.</value>
     </values>
@@ -15,11 +11,15 @@
         <value xsi:type="xsd:string">InspectionStatusUpdate</value>
     </values>
     <values>
-        <field>Unscheduled_Status__c</field>
-        <value xsi:type="xsd:string">None</value>
+        <field>Is_Active__c</field>
+        <value xsi:type="xsd:boolean">true</value>
     </values>
     <values>
         <field>Scope_To_Field_Services_Record_Type__c</field>
         <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>Unscheduled_Status__c</field>
+        <value xsi:type="xsd:string">None</value>
     </values>
 </CustomMetadata>

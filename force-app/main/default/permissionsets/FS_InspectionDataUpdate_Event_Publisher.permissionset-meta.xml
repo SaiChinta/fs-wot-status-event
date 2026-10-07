@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
     <classAccesses>
-        <apexClass>FS_SaStatusEventHandler</apexClass>
+        <apexClass>FS_AssignedResourceInspectorHandler</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
@@ -16,42 +16,11 @@
         <apexClass>FS_InspectionStatusPayloadDTO</apexClass>
         <enabled>true</enabled>
     </classAccesses>
-    <description>Publish FS_InspectionDataUpdate__e from Field Services Service Appointment status and scheduled start/end changes.</description>
-    <fieldPermissions>
-        <editable>true</editable>
-        <field>FS_InspectionDataUpdate__e.BookingReferenceNumber__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>true</editable>
-        <field>FS_InspectionDataUpdate__e.EventType__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>true</editable>
-        <field>FS_InspectionDataUpdate__e.InspectionId__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>true</editable>
-        <field>FS_InspectionDataUpdate__e.Payload__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>true</editable>
-        <field>FS_InspectionDataUpdate__e.ServiceAppointmentId__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>true</editable>
-        <field>FS_InspectionDataUpdate__e.WorkOrderId__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>true</editable>
-        <field>FS_InspectionDataUpdate__e.WorkOrderLineItemId__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
+    <classAccesses>
+        <apexClass>FS_SaStatusEventHandler</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <description>Publish FS_InspectionDataUpdate__e from confirmed Field Services creates and from dispatch, unschedule, assigned inspector, and schedule time changes.</description>
     <fieldPermissions>
         <editable>false</editable>
         <field>BCO_Detail__c.FS_BCO_Complexity__c</field>
@@ -60,6 +29,11 @@
     <fieldPermissions>
         <editable>false</editable>
         <field>BCO_Detail__c.FS_BCO_Number__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>ServiceAppointment.FS_Assigned_Inspector__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
@@ -103,13 +77,13 @@
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
-        <editable>false</editable>
-        <field>ServiceAppointment.FS_Is_Confirmed__c</field>
+        <editable>true</editable>
+        <field>ServiceAppointment.FS_IsManualInspection__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
-        <editable>true</editable>
-        <field>ServiceAppointment.FS_IsManualInspection__c</field>
+        <editable>false</editable>
+        <field>ServiceAppointment.FS_Is_Confirmed__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
