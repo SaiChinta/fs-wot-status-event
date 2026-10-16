@@ -33,6 +33,16 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
+        <field>BCO_Detail__c.FS_Manufacturer_BPID__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>BCO_Detail__c.FS_Manufacturer_Name__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
         <field>ServiceAppointment.FS_Assigned_Inspector__c</field>
         <readable>true</readable>
     </fieldPermissions>
@@ -109,11 +119,6 @@
     <fieldPermissions>
         <editable>false</editable>
         <field>ServiceAppointment.Priority__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <editable>false</editable>
-        <field>ServiceAppointment.Status</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>

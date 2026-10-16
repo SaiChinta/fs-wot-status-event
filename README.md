@@ -16,8 +16,7 @@ An event is published on **after update** when all of the following are true:
 
 1. Custom metadata **FS Inspection Status Event Setting** / **Default Setting** has `Is_Active__c` true.
 2. Record type is `Field_Services`.
-3. `FS_IsManualInspection__c` is **false** (CRM manual backfills are skipped).
-4. **Status** changed, or **`SchedStartTime`** / **`SchedEndTime`** changed.
+3. **Status** changed, or **`SchedStartTime`** / **`SchedEndTime`** changed. A manual inspection (`FS_IsManualInspection__c = true`) also publishes on insert, and the payload includes `isManualInspection`. Other creates do not publish.
 
 Every publish uses **`EventType__c = InspectionStatusUpdate`**. The JSON payload is `FS_InspectionStatusPayloadDTO`; null properties are omitted.
 
@@ -25,7 +24,7 @@ Parent Work Order lookups are **not** populated here. Alert Center already copie
 
 ## Manual inspection flag
 
-Checkbox **Is Manual Inspection** (`FS_IsManualInspection__c`) exists on Work Order, Work Order Line Item, and Service Appointment. CRM must set it to true on all three when it creates a backfill appointment for a manual booking. The publisher reads the Service Appointment field only.
+Checkbox **Is Manual Inspection** (`FS_IsManualInspection__c`) exists on Work Order, Work Order Line Item, and Service Appointment. CRM sets it to true on a manual booking. Inserting that Service Appointment publishes one event, with payload `isManualInspection`.
 
 ## Security
 

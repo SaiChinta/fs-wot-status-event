@@ -14,6 +14,8 @@ public class FS_InspectionStatusPayloadDTO {
   public String bcoNumber;
   public String propertyId;
   public String propertyAddress;
+  public String manufacturerBPID;
+  public String manufacturerName;
   public String workOrderLineItemNumber;
   public String workTypeName;
   public String inspectionType;
@@ -38,6 +40,7 @@ public class FS_InspectionStatusPayloadDTO {
   public String cancelledReason;
   public String bookingType;
   public Boolean isConfirmed;
+  public Boolean isManualInspection;
   public Id assignedInspectorId;
   public String assignedInspectorName;
   public ParentWorkDTO parentWork;

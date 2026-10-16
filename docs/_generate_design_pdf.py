@@ -355,9 +355,10 @@ def build():
     )
     story.append(
         p(
-            "Manual CRM backfill appointments are stamped "
+            "Manual inspections are stamped "
             "<font face='Courier'>FS_IsManualInspection__c = true</font> on the "
-            "Service Appointment. The publisher skips those records. The same checkbox "
+            "Service Appointment. That insert publishes one event, and the payload "
+            "includes isManualInspection. Other creates do not publish. The same checkbox "
             "exists on Work Order and Work Order Line Item so CRM can stamp the booking hierarchy.",
             s["body"],
         )
@@ -368,11 +369,11 @@ def build():
     story.extend(
         bullets(
             [
-                "Do not publish on create. Publish when FS_Is_Confirmed__c changes to true on update.",
+                "Publish a manual inspection on insert. Other creates do not publish. Publish when FS_Is_Confirmed__c changes to true on update.",
                 "Publish on update when the appointment is dispatched, canceled, fully unscheduled, or scheduled with an inspector and both schedule times that just changed.",
                 "Stamp ServiceAppointment.FS_Assigned_Inspector__c from Assigned Resource insert, resource change, and delete.",
                 "Always set EventType__c to InspectionStatusUpdate.",
-                "Skip manual inspections and any record type other than Field_Services.",
+                "Publish manual inspections and include isManualInspection. Skip any record type other than Field_Services.",
                 "Leave Alert Center parent-lookup fill and FSL managed triggers in place.",
             ],
             s,
@@ -453,7 +454,8 @@ def build():
             "resolveEventType is the only publish decision. The first matching rule "
             "wins, so one save produces at most one event. These gates apply first: "
             "Default Setting Is Active is true (missing CMDT defaults to active); "
-            "record type is Field_Services; FS_IsManualInspection__c is not true. "
+            "record type is Field_Services. Manual inspections are included, and the "
+            "payload sets isManualInspection. "
             "FS_Is_Confirmed__c is not one of these gates.",
             s["body"],
         )
@@ -461,8 +463,9 @@ def build():
     story.append(p("Create", s["h2"]))
     story.append(
         p(
-            "Insert does not publish, even when FS_Is_Confirmed__c is already true. "
-            "Confirmation is a later update.",
+            "A manual inspection publishes on insert. Any other insert does not publish, "
+            "even when FS_Is_Confirmed__c is already true. Confirmation of those "
+            "appointments is a later update.",
             s["body"],
         )
     )
@@ -512,8 +515,8 @@ def build():
         table(
             ["Situation", "Result"],
             [
-                ["Not Field_Services, or manual inspection, or CMDT inactive", "Skip"],
-                ["Service Appointment insert", "Skip"],
+                ["Not Field_Services, or CMDT inactive", "Skip"],
+                ["Non-manual Service Appointment insert", "Skip"],
                 ["Scheduled while inspector or either time is blank", "Skip"],
                 ["Arrival window, due date, actuals, or FS date stamps only", "Skip"],
                 ["Travel, OnSite, or Completed with no other matching change", "Skip"],
@@ -588,9 +591,9 @@ def build():
     story.append(
         p(
             "FS_IsManualInspection__c is a checkbox on Work Order, Work Order Line Item, "
-            "and Service Appointment. Publication reads only the Service Appointment field. "
-            "CRM must set all three when it creates a manual backfill. If the Service "
-            "Appointment flag stays false, events publish. The publisher set grants read and edit.",
+            "and Service Appointment. Inserting a Service Appointment with the flag true "
+            "publishes one event. The payload sets isManualInspection. CRM stamps all three "
+            "on a manual booking. The publisher set grants read and edit.",
             s["body"],
         )
     )
@@ -618,6 +621,7 @@ def build():
                 ["contactInformation", "First Inspection_Site_Contact__c name, phone, email"],
                 ["inspectionType", "WorkType.Name text before the first underscore"],
                 ["isConfirmed", "FS_Is_Confirmed__c"],
+                ["isManualInspection", "FS_IsManualInspection__c"],
                 ["assignedInspectorId / Name", "FS_Assigned_Inspector__c and its Name"],
                 ["cancelledReason / cancelledDate", "FS_Cancelled_Reason__c / FS_Cancelled_Date__c"],
                 ["schedStartTime / schedEndTime", "SchedStartTime / SchedEndTime"],
@@ -760,6 +764,7 @@ def build():
                 ["testUnscheduleDoesNotPublish", "None with an inspector still set does not publish"],
                 ["testUnschedulePublishesWhenInspectorCleared", "None and a blank inspector publishes"],
                 ["testAssignedResourceStampsInspector", "Insert, reassignment, and delete maintain the lookup"],
+                ["testManualInspectionPublishesEvent", "A scheduled manual inspection publishes, isManualInspection true"],
                 ["testInactiveSettingDoesNotPublish", "Inactive CMDT publishes nothing"],
             ],
             [88 * mm, 86 * mm],
@@ -833,7 +838,8 @@ def build():
     story.append(
         p(
             "Set FS_IsManualInspection__c true on the Work Order, line item, and Service "
-            "Appointment for every manual CRM backfill. Use a Field Services appointment with BCO Detail.",
+            "Appointment for a manual booking. The event still publishes, with "
+            "isManualInspection true. Use a Field Services appointment with BCO Detail.",
             s["body"],
         )
     )
@@ -841,7 +847,8 @@ def build():
         table(
             ["Step", "Expected"],
             [
-                ["Insert, confirmed or not", "No event"],
+                ["Insert a non-manual appointment", "No event"],
+                ["Insert a manual inspection", "One event, isManualInspection true"],
                 ["Update Is Confirmed to true", "One event, isConfirmed true"],
                 ["Scheduled, both times, then assign a resource", "One event after the lookup is stamped, with inspector and both times"],
                 ["Change schedule times only", "One event with the new times"],
@@ -851,7 +858,7 @@ def build():
                 ["Canceled, with a cancellation reason", "One event, status Canceled, cancelledReason set"],
                 ["None while the inspector is still set", "No event yet"],
                 ["Remove the last Assigned Resource at status None", "One event, status None, no assignedInspectorId"],
-                ["Is Manual Inspection checked, then change status", "No event"],
+                ["Is Manual Inspection checked, then schedule or dispatch", "One event, isManualInspection true"],
                 ["Subscriber user reads the event", "Read succeeds. Create is not required"],
             ],
             [88 * mm, 86 * mm],
@@ -869,7 +876,7 @@ def build():
                 "Is Manual Inspection, Is Confirmed, and Assigned Inspector are on the Field Services layouts",
                 "Default Setting active; SA and Assigned Resource trigger actions are not bypassed",
                 "No second MetadataTriggerHandler on Service Appointment or Assigned Resource",
-                "CRM stamps FS_IsManualInspection__c on manual backfills",
+                "CRM stamps FS_IsManualInspection__c so the payload identifies manual inspections",
                 "Smoke tests passed",
             ],
             s,

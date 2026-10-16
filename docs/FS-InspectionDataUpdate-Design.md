@@ -20,11 +20,9 @@ There is a single message type. Confirmation, schedule, reschedule, dispatch, un
 
 Travel, OnSite, and Completed status changes do **not** publish by themselves.
 
-### Manual CRM backfill
+### Manual inspections
 
-Do not publish for a Service Appointment that is a **backfill appointment created for a manual booking created in CRM**.
-
-Those backfills are stamped with **Is Manual Inspection** (`FS_IsManualInspection__c = true`) on Work Order, Work Order Line Item, and Service Appointment. The publisher evaluates the **Service Appointment** flag and skips the record.
+A manual inspection (`FS_IsManualInspection__c = true` on the Service Appointment) publishes on **after insert**. Later confirm, schedule, dispatch, cancel, and unschedule updates still publish. The payload includes `isManualInspection`. Other creates do not publish. CRM still stamps the checkbox on Work Order, Work Order Line Item, and Service Appointment.
 
 ---
 
@@ -32,12 +30,12 @@ Those backfills are stamped with **Is Manual Inspection** (`FS_IsManualInspectio
 
 ### Goals
 
-- Do not publish on create. Publish when `FS_Is_Confirmed__c` changes to true on update.
+- Publish a manual inspection on insert. Do not publish other creates. Publish when `FS_Is_Confirmed__c` changes to true on update.
 - Publish on **update** when the appointment is dispatched, canceled, fully unscheduled, or scheduled with an inspector and both schedule times that just changed.
 - Stamp `ServiceAppointment.FS_Assigned_Inspector__c` from Assigned Resource insert, resource change, and delete, so the schedule event can include the inspector.
 - Always set header `EventType__c` to **`InspectionStatusUpdate`**.
 - Map the inspection payload and omit null JSON properties.
-- Skip `FS_IsManualInspection__c = true` and any record type other than **`Field_Services`**.
+- Publish manual inspections (`FS_IsManualInspection__c = true`) and include `isManualInspection` in the payload. Skip any record type other than **`Field_Services`**.
 - Sit beside Alert Center and FSL triggers. Do not fill parent Work Order lookups.
 
 ### Non-goals
@@ -46,7 +44,7 @@ Those backfills are stamped with **Is Manual Inspection** (`FS_IsManualInspectio
 - Do not publish Travel, OnSite, or Completed unless a rule below also matches (it does not).
 - Do not publish solely because arrival window, due date, actuals, or `FS_*` date stamps changed.
 - Do not publish from the Assigned Resource trigger. That trigger only writes the inspector lookup.
-- Do not publish on Service Appointment insert. `FS_Is_Confirmed__c` is set by an update.
+- Do not publish a non-manual Service Appointment on insert. `FS_Is_Confirmed__c` for those appointments is set by an update.
 - Do not stamp `FS_IsManualInspection__c` from this package.
 - Do not subscribe to the event in this package. The subscriber application is configured in the org after deploy.
 
@@ -54,7 +52,7 @@ Those backfills are stamped with **Is Manual Inspection** (`FS_IsManualInspectio
 
 ## 3. Architecture
 
-Salesforce cannot register a trigger on one record type. Both triggers fire for every record of their object. Apex then keeps Field Services appointments that are not manual inspections.
+Salesforce cannot register a trigger on one record type. Both triggers fire for every record of their object. Apex then keeps Field Services appointments, including manual inspections.
 
 Scheduling is two DMLs. Field Service writes the Service Appointment (status and times) and the Assigned Resource separately. The appointment trigger waits until the inspector lookup and both times are populated, so the subscriber receives **one** schedule event that already contains the inspector and the times.
 
@@ -74,8 +72,7 @@ Trigger Actions Framework
 FS_SaStatusEventHandler
         │
         ├─ Default_Setting.Is_Active__c
-        ├─ record type Field_Services
-        ├─ FS_IsManualInspection__c is not true
+        ├─ record type Field_Services (manual inspections included)
         ├─ resolveEventType (confirm, schedule, dispatch, cancel, unschedule)
         │
         ▼
@@ -146,14 +143,13 @@ Parent Work Order lookups on the appointment (`FS_Work_Order__c`, `FS_Work_Order
 These gates apply before any rule:
 
 1. **CMDT** `FS_Inspection_Status_Event_Setting__mdt` / `Default_Setting` has `Is_Active__c` true. If the record is missing, the packaged default is active.
-2. **Record type** is `Field_Services`. If that record type is missing, nothing publishes.
-3. **`FS_IsManualInspection__c` is not true** on the Service Appointment. The queried row is checked again before the payload is built.
+2. **Record type** is `Field_Services`. If that record type is missing, nothing publishes. `FS_IsManualInspection__c` does not gate publication. When it is true, the payload sets `isManualInspection`.
 
 `FS_Is_Confirmed__c` is **not** one of these gates. A later dispatch, cancel, unschedule, or schedule update still publishes when the flag is false.
 
 ### Create (after insert)
 
-Insert does not publish. A row created with `FS_Is_Confirmed__c` already true still waits for an update.
+A manual inspection publishes on insert, including when status is still None. Any other insert does not publish. A non-manual row created with `FS_Is_Confirmed__c` already true still waits for an update.
 
 ### Update (after update)
 
@@ -190,9 +186,8 @@ A status change to None while the inspector is still populated does not publish.
 | Situation | Result |
 |---|---|
 | Record type is not Field_Services | Skip |
-| `FS_IsManualInspection__c = true` | Skip |
 | Default Setting inactive | Skip |
-| Service Appointment insert, confirmed or not | Skip |
+| Service Appointment insert, and `FS_IsManualInspection__c` is not true | Skip |
 | Status becomes Scheduled but inspector or either schedule time is blank | Skip |
 | Only `ArrivalWindowStartTime` / `ArrivalWindowEndTime` changed | Skip |
 | Only DueDate, EarliestStartTime, actuals, or FS_* date stamps changed | Skip |
@@ -325,6 +320,7 @@ Apex is case-insensitive, so the DTO cannot expose both `userName` and `username
 | `cancelledReason` | `FS_Cancelled_Reason__c` |
 | `bookingType` | `FS_Booking_Type__c` |
 | `isConfirmed` | `FS_Is_Confirmed__c` is true |
+| `isManualInspection` | `FS_IsManualInspection__c` |
 | `assignedInspectorId` | `FS_Assigned_Inspector__c` |
 | `assignedInspectorName` | `FS_Assigned_Inspector__r.Name` |
 | `parentWork.*` | Work Order and WOLI ids and numbers |
@@ -378,10 +374,9 @@ Implements `TriggerAction.AfterInsert` and `TriggerAction.AfterUpdate`.
 |---|---|
 | `afterInsert` / `afterUpdate` | Cast the TAF lists and call `handleTrigger` |
 | `handleTrigger` | Active setting, Field Services filter, `resolveEventType`, query, map, publish |
-| `isPublishableAppointment` | Field_Services and not a manual inspection |
+| `isPublishableAppointment` | Field_Services, including manual inspections |
 | `resolveEventType` | No create. Confirm, Dispatched, Canceled, finished unschedule, or Scheduled with inspector and both times |
 | `queryAppointments` | Payload SOQL. `WITH SECURITY_ENFORCED`, with a system-mode retry when FLS blocks a payload field |
-| `excludeManualInspections` | Second pass on the queried rows |
 | `publishEvents` | `EventBus.publish`. Tests also capture `publishedEventsForTest` |
 
 Background users `CloudIntegrationUser` and `AutomatedProcess` cannot be granted FLS. Those user types, and a test hook, query and publish in system mode. If an interactive user can read Service Appointment but lacks FLS on a payload field such as `EmployeeNumber`, the query retries in system mode so scheduling is not blocked.
@@ -490,7 +485,8 @@ Tests call the handlers directly so they do not depend on TAF metadata delivery 
 | Test | Expectation |
 |---|---|
 | `testParentLookupsPopulatedOnInsert` | Alert Center copied the parent Work Order and WOLI lookups |
-| `testCreateDoesNotPublish` | Insert does not publish, even when already confirmed |
+| `testCreateDoesNotPublish` | A non-manual insert does not publish, even when already confirmed |
+| `testManualInspectionInsertPublishesEvent` | Inserting a manual inspection publishes one event |
 | `testConfirmedUpdatePublishesEvent` | Setting Is Confirmed on update publishes |
 | `testStatusBecomesScheduledPublishesEvent` | Status None to Scheduled publishes when inspector and both times are already set |
 | `testNewInspectorAndNewTimesPublishesEvent` | One event with the new inspector and both times |
@@ -505,7 +501,7 @@ Tests call the handlers directly so they do not depend on TAF metadata delivery 
 | `testAssignedResourceStampsInspector` | Insert stamps the lookup, resource change updates it, travel-only does not, deleting the last row clears it |
 | `testAssignedResourceTravelIsMapped` | Payload includes crew members and travel minutes |
 | `testNonFieldServicesRecordTypeDoesNotPublish` | Other record types do not publish |
-| `testManualInspectionDoesNotPublish` | Manual inspection does not publish |
+| `testManualInspectionPublishesEvent` | A scheduled manual inspection publishes, with `isManualInspection` true |
 | `testInactiveSettingDoesNotPublish` | Inactive CMDT publishes nothing |
 | `testSettingsDefaultWhenMissing` | Missing CMDT defaults to active, `InspectionStatusUpdate`, and `None` |
 | `testBlankSettingFieldsAndEmptyTrigger` | Blank CMDT text uses the same defaults |
@@ -581,9 +577,7 @@ Both objects:
 
 ### 14.7 CRM manual-booking backfill
 
-When CRM creates a manual booking and a Field Service backfill appointment, set **`FS_IsManualInspection__c = true`** on the Work Order, the Work Order Line Item, and the Service Appointment. If the Service Appointment flag stays false, events will publish.
-
-Optional data fix: set the checkbox on historical backfill appointments so they stop emitting.
+When CRM creates a manual booking, set **`FS_IsManualInspection__c = true`** on the Work Order, the Work Order Line Item, and the Service Appointment. The publisher still sends the event. The payload sets `isManualInspection` from the Service Appointment checkbox.
 
 ### 14.8 Smoke test
 
@@ -591,7 +585,8 @@ Use a Field Services appointment with BCO Detail populated.
 
 | Step | Action | Expected |
 |---|---|---|
-| 1 | Insert, whether or not **Is Confirmed** is true | No event |
+| 1 | Insert a non-manual appointment, whether or not **Is Confirmed** is true | No event |
+| 1a | Insert a manual inspection (`FS_IsManualInspection__c` true) | One event, `isManualInspection` true |
 | 2 | Update **Is Confirmed** from false to true | One event, `isConfirmed` true |
 | 3 | Set status **Scheduled**, both schedule times, and assign a Service Resource | One event after the inspector lookup is stamped. Payload has `assignedInspectorId`, `schedStartTime`, and `schedEndTime`. No second event for the incomplete save |
 | 4 | Change **SchedStartTime** or **SchedEndTime** only, same inspector | One event with the new times |
@@ -601,7 +596,7 @@ Use a Field Services appointment with BCO Detail populated.
 | 8 | Status **Canceled**, with a cancellation reason | One event, `status` = Canceled, `cancelledReason` populated |
 | 9 | Unschedule: status **None** while the inspector is still set | No event yet |
 | 10 | Remove the Assigned Resource so the inspector lookup clears, status **None** | One event, `status` = None, no `assignedInspectorId` |
-| 11 | Check **Is Manual Inspection**, then change status | No event |
+| 11 | Check **Is Manual Inspection**, then schedule or dispatch | One event, `isManualInspection` true |
 | 12 | Repeat step 3 as a dispatcher with the publisher set, and as the subscriber user | Dispatcher publish succeeds. Subscriber user can read the event and cannot be required to create it |
 
 ---
@@ -617,7 +612,7 @@ Use a Field Services appointment with BCO Detail populated.
 - [ ] Default Setting active, Event Type `InspectionStatusUpdate`, Unscheduled Status `None`
 - [ ] SA after-insert and after-update actions, and the three Assigned Resource actions, are not bypassed
 - [ ] No second `MetadataTriggerHandler` on Service Appointment or Assigned Resource
-- [ ] CRM stamps `FS_IsManualInspection__c` on manual backfills
+- [ ] CRM stamps `FS_IsManualInspection__c` so the payload identifies manual inspections
 - [ ] Smoke tests 1–12 passed
 
 ---

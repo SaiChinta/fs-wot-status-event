@@ -1,8 +1,8 @@
 /**
  * @description Trigger Actions Framework action that publishes
  * FS_InspectionDataUpdate__e for Field Services updates: confirmation, schedule,
- * dispatch, cancel, and unschedule. Creates do not publish.
- * Manual CRM backfill appointments are skipped.
+ * dispatch, cancel, and unschedule. A manual inspection also publishes on insert.
+ * Other creates do not publish.
  */
 public inherited sharing class FS_SaStatusEventHandler implements
   TriggerAction.AfterInsert,
@@ -35,7 +35,7 @@ public inherited sharing class FS_SaStatusEventHandler implements
    * @param newList Trigger.new records.
    */
   public void afterInsert(List<SObject> newList) {
-    // Creates do not publish. Confirmation is an update.
+    // A manual inspection publishes on insert. Other creates do not.
     handleTrigger(toAppointments(newList), null, System.TriggerOperation.AFTER_INSERT);
   }
 
@@ -148,7 +148,7 @@ public inherited sharing class FS_SaStatusEventHandler implements
     }
     List<ServiceAppointment> publishable = new List<ServiceAppointment>();
     Map<Id, String> eventTypeBySaId = new Map<Id, String>();
-    for (ServiceAppointment sa : excludeManualInspections(queryAppointments(appointmentIds))) {
+    for (ServiceAppointment sa : queryAppointments(appointmentIds)) {
       // A later save in this transaction can leave the row unpublished,
       // such as status None while the inspector lookup is still set.
       if (!isFinalStatePublishable(sa, config)) {
@@ -166,7 +166,7 @@ public inherited sharing class FS_SaStatusEventHandler implements
   }
 
   /**
-   * @description True when the saved row is still a confirmation, schedule, dispatch, cancel, or finished unschedule.
+   * @description True when the saved row is a manual inspection, confirmation, schedule, dispatch, cancel, or finished unschedule.
    * @param sa Appointment read after the transaction commits.
    * @param config Parsed CMDT configuration.
    * @return True if the subscriber should receive this row.
@@ -175,6 +175,10 @@ public inherited sharing class FS_SaStatusEventHandler implements
     ServiceAppointment sa,
     FS_InspectionStatusEventSettings.Config config
   ) {
+    // A manual inspection is published from insert, before schedule or confirmation.
+    if (sa.FS_IsManualInspection__c == true) {
+      return true;
+    }
     if (sa.FS_Is_Confirmed__c == true) {
       return true;
     }
@@ -219,7 +223,8 @@ public inherited sharing class FS_SaStatusEventHandler implements
   }
 
   /**
-   * @description True when the appointment is Field_Services and not a manual CRM backfill.
+   * @description True when the appointment uses the Field Services record type.
+   * Manual inspections publish under the same rules. The payload records the flag.
    * @param sa Trigger new appointment.
    * @param fieldServicesRtId Field_Services record type Id, or null if absent.
    * @return True if the appointment should be evaluated for publication.
@@ -228,33 +233,15 @@ public inherited sharing class FS_SaStatusEventHandler implements
     ServiceAppointment sa,
     Id fieldServicesRtId
   ) {
-    // Other record types and CRM backfills never publish.
     if (fieldServicesRtId == null || sa.RecordTypeId != fieldServicesRtId) {
       return false;
     }
-    return sa.FS_IsManualInspection__c != true;
-  }
-
-  /**
-   * @description Drops queried appointments stamped as manual CRM backfills.
-   * @param saRecords Queried Service Appointment records.
-   * @return Appointments that may be mapped to platform events.
-   */
-  private static List<ServiceAppointment> excludeManualInspections(
-    List<ServiceAppointment> saRecords
-  ) {
-    List<ServiceAppointment> matches = new List<ServiceAppointment>();
-    for (ServiceAppointment sa : saRecords) {
-      if (sa.FS_IsManualInspection__c != true) {
-        matches.add(sa);
-      }
-    }
-    return matches;
+    return true;
   }
 
   /**
    * @description Resolves EventType__c for this DML, or null when nothing should publish.
-   * Creates do not publish. An update publishes when FS_Is_Confirmed__c becomes true,
+   * A manual inspection publishes on insert. Other creates do not. An update publishes when FS_Is_Confirmed__c becomes true,
    * when status becomes Dispatched, Canceled, or Scheduled with an inspector and both times,
    * or when an unschedule finishes with a blank inspector.
    * @param sa Appointment after the DML.
@@ -269,8 +256,11 @@ public inherited sharing class FS_SaStatusEventHandler implements
     ServiceAppointment oldSa,
     FS_InspectionStatusEventSettings.Config config
   ) {
-    // Create never publishes. FS_Is_Confirmed__c is set by a later update.
+    // Only a manual inspection publishes on insert. Confirmation of other appointments is an update.
     if (oldSa == null) {
+      if (sa.FS_IsManualInspection__c == true) {
+        return config.eventType;
+      }
       return null;
     }
 
@@ -384,6 +374,7 @@ public inherited sharing class FS_SaStatusEventHandler implements
       'FS_Work_Order_Line_Item__r.FS_ExternalRefId__c, ' +
       'FS_ExternalRefId__c, FS_CRMInspection_Id__c, FS_BCO_Detail__c, FS_BCO_Detail__r.FS_BCO_Number__c, ' +
       'FS_BCO_Detail__r.FS_BCO_Complexity__c, FS_BCO_Detail__r.FS_Property_ID__c, ' +
+      'FS_BCO_Detail__r.FS_Manufacturer_BPID__c, FS_BCO_Detail__r.FS_Manufacturer_Name__c, ' +
       'FS_BCO_Detail__r.FS_BCO_PropertyAddress__c, FS_Dispatched_Date__c, ' +
       'FS_Cancelled_Date__c, FS_Travel_Date__c, FS_OnSite_Date__c, FS_Completed_Date__c, ' +
       'FS_Booking_Type__c, FS_Inspection_Status__c, FS_Cancelled_Reason__c, ' +

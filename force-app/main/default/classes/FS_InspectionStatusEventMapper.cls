@@ -77,6 +77,8 @@ public inherited sharing class FS_InspectionStatusEventMapper {
     payload.bcoNumber = bcoNumber(sa);
     payload.propertyId = bcoPropertyId(sa);
     payload.propertyAddress = bcoPropertyAddress(sa);
+    payload.manufacturerBPID = manufacturerBPID(sa);
+    payload.manufacturerName = manufacturerName(sa);
     payload.workOrderLineItemNumber = lineItemNumber(sa);
     payload.workTypeName = sa.WorkType == null ? null : sa.WorkType.Name;
     payload.inspectionType = sa.WorkType == null ? null : sa.WorkType.Name.substringBefore('_');
@@ -98,6 +100,7 @@ public inherited sharing class FS_InspectionStatusEventMapper {
     payload.cancelledReason = sa.FS_Cancelled_Reason__c;
     payload.bookingType = sa.FS_Booking_Type__c;
     payload.isConfirmed = sa.FS_Is_Confirmed__c == true;
+    payload.isManualInspection = sa.FS_IsManualInspection__c;
     payload.assignedInspectorId = sa.FS_Assigned_Inspector__c;
     payload.assignedInspectorName = sa.FS_Assigned_Inspector__r == null
       ? null
@@ -287,6 +290,30 @@ public static String contactInformation(ServiceAppointment sa) {
       return null;
     }
     return sa.FS_Work_Order__r.Description;
+  }
+
+  /**
+   * @description BCO Number from the related BCO Detail record.
+   * @param sa Queried Service Appointment.
+   * @return BCO Number, or null.
+   */
+  private static String manufacturerBPID(ServiceAppointment sa) {
+    if (sa.FS_BCO_Detail__r == null) {
+      return null;
+    }
+    return sa.FS_BCO_Detail__r.FS_Manufacturer_BPID__c;
+  }
+
+  /**
+   * @description BCO Number from the related BCO Detail record.
+   * @param sa Queried Service Appointment.
+   * @return BCO Number, or null.
+   */
+  private static String manufacturerName(ServiceAppointment sa) {
+    if (sa.FS_BCO_Detail__r == null) {
+      return null;
+    }
+    return sa.FS_BCO_Detail__r.FS_Manufacturer_Name__c;
   }
 
   /**

@@ -48,7 +48,7 @@
     </values>
     <values>
         <field>Description__c</field>
-        <value xsi:type="xsd:string">Service Appointment after insert does not publish. Confirmation and schedule are updates.</value>
+        <value xsi:type="xsd:string">A manual inspection publishes on Service Appointment insert. Other creates do not. Confirmation and schedule of those appointments are updates.</value>
     </values>
     <values>
         <field>Entry_Criteria__c</field>

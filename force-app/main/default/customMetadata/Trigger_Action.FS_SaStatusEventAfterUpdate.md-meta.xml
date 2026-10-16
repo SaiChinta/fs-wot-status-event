@@ -48,7 +48,7 @@
     </values>
     <values>
         <field>Description__c</field>
-        <value xsi:type="xsd:string">Publishes FS_InspectionDataUpdate__e when a Field Services appointment is confirmed, scheduled, dispatched, canceled, or unscheduled. Skips FS_IsManualInspection__c.</value>
+        <value xsi:type="xsd:string">Publishes FS_InspectionDataUpdate__e when a Field Services appointment is confirmed, scheduled, dispatched, canceled, or unscheduled, including manual inspections.</value>
     </values>
     <values>
         <field>Entry_Criteria__c</field>

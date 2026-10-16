@@ -22,7 +22,7 @@ Spreadsheet objects `InspectionStatusUpdate__e`, `InspectionCancellation__e`, an
 | `TR001_Service_*` | FSL managed | Field Service internal automation |
 | `CalculateTravelTimeOnServiceChange` | FSL managed | Travel time |
 
-`FS_SaStatusEventTrigger` fires for every Service Appointment after update. `FS_SaStatusEventHandler` publishes only for **Field_Services** and only when `FS_IsManualInspection__c` is false.
+`FS_SaStatusEventTrigger` fires for every Service Appointment after insert and after update. A Field Services appointment with `FS_IsManualInspection__c` true publishes on insert. Other creates do not. The payload records that flag as `isManualInspection`.
 
 TAF pattern in the org (`BCO_Customer_Access__c`): unpackaged trigger calls `new MetadataTriggerHandler().run()`; handler implements `TriggerAction.*`; CMDT binds the class.
 
@@ -48,7 +48,7 @@ Parent lookup fill stays in `FS_ServiceAppointmentTriggerHandler.populateParentF
 
 ## Tracker correction
 
-An earlier draft treated a “do not publish” rule as a portal-creator filter on Completed. The tracker intent is: **skip backfill appointments for manual CRM bookings**, implemented as `FS_IsManualInspection__c` on Work Order, Work Order Line Item, and Service Appointment.
+An earlier draft treated a “do not publish” rule as a portal-creator filter on Completed, then as a skip of manual CRM backfills via `FS_IsManualInspection__c`. The current rule publishes those Field Services appointments and sets payload `isManualInspection` from the Service Appointment checkbox. CRM still stamps the checkbox on Work Order, Work Order Line Item, and Service Appointment.
 
 ## What this package does not do
 

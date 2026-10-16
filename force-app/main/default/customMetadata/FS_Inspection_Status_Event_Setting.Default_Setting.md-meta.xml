@@ -4,7 +4,7 @@
     <protected>false</protected>
     <values>
         <field>Description__c</field>
-        <value xsi:type="xsd:string">Publishes FS_InspectionDataUpdate__e for Field Services appointment status and scheduled start/end changes. Manual CRM backfills are excluded.</value>
+        <value xsi:type="xsd:string">Publishes FS_InspectionDataUpdate__e for Field Services appointment status and scheduled start/end changes, including manual inspections.</value>
     </values>
     <values>
         <field>Event_Type__c</field>

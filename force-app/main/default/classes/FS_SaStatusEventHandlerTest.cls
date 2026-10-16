@@ -354,32 +354,69 @@ private class FS_SaStatusEventHandlerTest {
   }
 
   /**
-   * @description CRM manual backfill appointments do not publish.
+   * @description A manual inspection publishes under the same schedule rule, with the flag in the payload.
    */
   @IsTest
-  static void testManualInspectionDoesNotPublish() {
+  static void testManualInspectionPublishesEvent() {
     applySettingsOverride(true);
-    ServiceAppointment oldRecord = getTestAppointment();
-    ServiceAppointment newRecord = oldRecord.clone(true, true, false, false);
-    newRecord.FS_IsManualInspection__c = true;
-    newRecord.Status = 'Scheduled';
-    newRecord.SchedStartTime = DateTime.now().addHours(1);
-    newRecord.SchedEndTime = DateTime.now().addHours(3);
-    newRecord.FS_Assigned_Inspector__c = ensureInspectorId();
+    registerStatusTransitions();
+    ServiceAppointment appointment = getTestAppointment();
+    appointment.FS_IsManualInspection__c = true;
+    appointment.Status = 'Scheduled';
+    appointment.SchedStartTime = DateTime.now().addHours(1);
+    appointment.SchedEndTime = DateTime.now().addHours(3);
+    appointment.FS_Assigned_Inspector__c = ensureInspectorId();
 
     Test.startTest();
-    FS_SaStatusEventHandler.publishedEventsForTest.clear();
-    new FS_SaStatusEventHandler().afterUpdate(
-      new List<SObject>{ newRecord },
-      new List<SObject>{ oldRecord }
+    update appointment;
+    Test.stopTest();
+
+    System.assertEquals(
+      1,
+      FS_SaStatusEventHandler.publishedEventsForTest.size(),
+      'A manual inspection should publish when it is scheduled.'
+    );
+    Map<String, Object> payload = (Map<String, Object>) JSON.deserializeUntyped(
+      FS_SaStatusEventHandler.publishedEventsForTest[0].Payload__c
+    );
+    System.assertEquals(true, payload.get('isManualInspection'));
+  }
+
+  /**
+   * @description Inserting a manual inspection publishes one event. Other creates do not.
+   */
+  @IsTest
+  static void testManualInspectionInsertPublishesEvent() {
+    applySettingsOverride(true);
+    ServiceAppointment source = [
+      SELECT ParentRecordId, ServiceTerritoryId, RecordTypeId, FS_BCO_Detail__c
+      FROM ServiceAppointment
+      LIMIT 1
+    ];
+
+    Test.startTest();
+    insert new ServiceAppointment(
+      ParentRecordId = source.ParentRecordId,
+      ServiceTerritoryId = source.ServiceTerritoryId,
+      EarliestStartTime = DateTime.now(),
+      DueDate = DateTime.now().addDays(7),
+      Status = 'None',
+      RecordTypeId = source.RecordTypeId,
+      FS_ExternalRefId__c = 'I004382767',
+      FS_IsManualInspection__c = true,
+      FS_BCO_Detail__c = source.FS_BCO_Detail__c
     );
     Test.stopTest();
 
     System.assertEquals(
-      0,
+      1,
       FS_SaStatusEventHandler.publishedEventsForTest.size(),
-      'Service Appointments with FS_IsManualInspection__c true should not publish.'
+      'Inserting a manual inspection should publish one event.'
     );
+    Map<String, Object> payload = (Map<String, Object>) JSON.deserializeUntyped(
+      FS_SaStatusEventHandler.publishedEventsForTest[0].Payload__c
+    );
+    System.assertEquals(true, payload.get('isManualInspection'));
   }
 
   /**

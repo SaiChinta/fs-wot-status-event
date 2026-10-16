@@ -149,15 +149,15 @@
             <default>false</default>
         </values>
         <values>
-            <fullName>Failed</fullName>
-            <default>false</default>
-        </values>
-        <values>
             <fullName>NACC</fullName>
             <default>false</default>
         </values>
         <values>
             <fullName>OPEN</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Others</fullName>
             <default>false</default>
         </values>
         <values>
@@ -182,10 +182,6 @@
         </values>
         <values>
             <fullName>PSTP</fullName>
-            <default>false</default>
-        </values>
-        <values>
-            <fullName>Passed</fullName>
             <default>false</default>
         </values>
         <values>
